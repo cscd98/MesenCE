@@ -25,6 +25,10 @@ else ifeq ($(UNAME_S),Darwin)
 	MESENOS := osx
 	ifeq ($(platform),ios9)
 		SHAREDLIB := mesen2_libretro_ios.dylib
+	else ifeq ($(platform),ios-arm64)
+		SHAREDLIB := mesen2_libretro_ios.dylib
+	else ifeq ($(platform),tvos-arm64)
+		SHAREDLIB := mesen2_libretro_tvos.dylib
 	else ifeq ($(platform),osx)
 		MESENFLAGS += -mmacosx-version-min=10.15
 		SHAREDLIB := mesen2_libretro.dylib
