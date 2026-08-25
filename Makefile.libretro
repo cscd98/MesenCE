@@ -24,14 +24,34 @@ ifeq ($(UNAME_S),Linux)
 else ifeq ($(UNAME_S),Darwin)
 	MESENOS := osx
 	ifeq ($(platform),ios9)
+		LIBRETRO_APPLE_PLATFORM := arm64-apple-ios9.0
+		LIBRETRO_APPLE_ISYSROOT := $(shell xcodebuild -version -sdk iphoneos Path)
 		SHAREDLIB := mesen2_libretro_ios.dylib
+		MESENFLAGS += -target $(LIBRETRO_APPLE_PLATFORM)
+		MESENFLAGS += -isysroot $(LIBRETRO_APPLE_ISYSROOT)
 	else ifeq ($(platform),ios-arm64)
+		LIBRETRO_APPLE_PLATFORM := arm64-apple-ios13.0
+		LIBRETRO_APPLE_ISYSROOT := $(shell xcodebuild -version -sdk iphoneos Path)
 		SHAREDLIB := mesen2_libretro_ios.dylib
+		MESENFLAGS += -target $(LIBRETRO_APPLE_PLATFORM)
+		MESENFLAGS += -isysroot $(LIBRETRO_APPLE_ISYSROOT)
 	else ifeq ($(platform),tvos-arm64)
+		LIBRETRO_APPLE_PLATFORM := arm64-apple-tvos13.0
+		LIBRETRO_APPLE_ISYSROOT := $(shell xcodebuild -version -sdk appletvos Path)
 		SHAREDLIB := mesen2_libretro_tvos.dylib
+		MESENFLAGS += -target $(LIBRETRO_APPLE_PLATFORM)
+		MESENFLAGS += -isysroot $(LIBRETRO_APPLE_ISYSROOT)
 	else ifeq ($(platform),osx)
-		MESENFLAGS += -mmacosx-version-min=10.15
+		LIBRETRO_APPLE_ISYSROOT := $(shell xcodebuild -version -sdk macosx Path)
 		SHAREDLIB := mesen2_libretro.dylib
+		MESENFLAGS += -mmacosx-version-min=10.15
+		MESENFLAGS += -isysroot $(LIBRETRO_APPLE_ISYSROOT)
+		ifeq ($(arch),arm)
+			LIBRETRO_APPLE_PLATFORM := arm64-apple-macos10.15
+		else
+			LIBRETRO_APPLE_PLATFORM := x86_64-apple-macos10.15
+		endif
+		MESENFLAGS += -target $(LIBRETRO_APPLE_PLATFORM)
 	else
 		SHAREDLIB := mesen2_libretro.dylib
 	endif
