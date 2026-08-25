@@ -2,15 +2,15 @@
 #Both clang & gcc work fine - clang seems to output faster code
 
 MESENFLAGS=
-USE_GCC ?= true
 
-ifeq ($(USE_GCC),true)
-	CXX ?= g++
-	CC ?= gcc
-else
-	CXX ?= clang++
-	CC ?= clang
-endif
+CXX ?= g++
+CC ?= gcc
+
+USE_GCC ?= $(shell $(CXX) --version | head -1 | grep -qiE 'gcc|g\+\+' && echo true)
+
+DEBUG ?= 0
+HAVE_LTO ?= 1
+STATICLINK ?= true
 
 LINKCHECKUNRESOLVED := -Wl,-z,defs
 
@@ -23,41 +23,34 @@ ifeq ($(UNAME_S),Linux)
 	SHAREDLIB := mesen2_libretro.so
 else ifeq ($(UNAME_S),Darwin)
 	MESENOS := osx
-	SHAREDLIB := mesen2_libretro.dylib
-	LTO := false
+	ifeq ($(platform),ios9)
+		SHAREDLIB := mesen2_libretro_ios.dylib
+	else ifeq ($(platform),osx)
+		MESENFLAGS += -mmacosx-version-min=10.15
+		SHAREDLIB := mesen2_libretro.dylib
+	else
+		SHAREDLIB := mesen2_libretro.dylib
+	endif
+	HAVE_LTO := 0
 	STATICLINK := false
 	LINKCHECKUNRESOLVED :=
 else ifeq ($(OS),Windows_NT)
-	   SHAREDLIB := mesen2_libretro.dll
+	MESENOS := windows
+	SHAREDLIB := mesen2_libretro.dll
 endif
 
-MESENFLAGS += -m64
+MACHINE := $(shell $(CXX) -dumpmachine)
 
-MACHINE := $(shell uname -m)
-ifeq ($(MACHINE),x86_64)
+ifneq ($(filter x86_64%,$(MACHINE)),)
 	MESENPLATFORM := $(MESENOS)-x64
 endif
-ifneq ($(filter %86,$(MACHINE)),)
-	MESENPLATFORM := $(MESENOS)-x64
-endif
-# TODO: this returns `aarch64` on one of my machines...
-ifneq ($(filter arm%,$(MACHINE)),)
+ifneq ($(filter arm64% aarch64%,$(MACHINE)),)
 	MESENPLATFORM := $(MESENOS)-arm64
 endif
-ifeq ($(MACHINE),aarch64)
-	MESENPLATFORM := $(MESENOS)-arm64
-	ifeq ($(USE_GCC),true)
-		#don't set -m64 on arm64 for gcc (unrecognized option)
-		MESENFLAGS=
-	endif
-endif
-
-DEBUG ?= 0
-STATICLINK ?= true
 
 ifeq ($(DEBUG),0)
 	MESENFLAGS += -O3
-	ifneq ($(LTO),false)
+	ifeq ($(HAVE_LTO),1)
 		MESENFLAGS += -DHAVE_LTO
 		ifneq ($(USE_GCC),true)
 			MESENFLAGS += -flto=thin
@@ -105,16 +98,17 @@ SEVENZIPOBJ := $(SEVENZIPSRC:.c=.o)
 LUASRC := $(shell find Lua -name '*.c')
 LUAOBJ := $(LUASRC:.c=.o)
 
-FSLIB := -lstdc++fs
+ifeq ($(platform),unix)
+LDFLAGS += -Wl,--version-script=Libretro/link.T -Wl,--no-undefined
+endif
 
-libretro: CFLAGS   += -D LIBRETRO $(LTO)
-libretro: CXXFLAGS += -D LIBRETRO $(LTO)
-libretro: LDFLAGS  += $(LTO)
+libretro: CFLAGS   += -D LIBRETRO
+libretro: CXXFLAGS += -D LIBRETRO
 
 all: libretro
 
 libretro: Libretro/libretro.o $(SEVENZIPOBJ) $(LUAOBJ) $(UTILOBJ) $(COREOBJ)
-	$(CXX) $(CXXFLAGS) $(LINKOPTIONS) $(LINKCHECKUNRESOLVED) $(LDFLAGS) -Wl,--version-script=Libretro/link.T -Wl,--no-undefined -shared -o $(SHAREDLIB) Libretro/libretro.o $(SEVENZIPOBJ) $(LUAOBJ) $(UTILOBJ) $(COREOBJ) -pthread $(FSLIB)
+	$(CXX) $(CXXFLAGS) $(LINKOPTIONS) $(LINKCHECKUNRESOLVED) $(LDFLAGS) -shared -o $(SHAREDLIB) Libretro/libretro.o $(SEVENZIPOBJ) $(LUAOBJ) $(UTILOBJ) $(COREOBJ) -pthread
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -129,4 +123,3 @@ clean:
 	rm -f $(LUAOBJ)
 	rm -f $(SHAREDLIB)
 	rm -f Libretro/libretro.o
-
